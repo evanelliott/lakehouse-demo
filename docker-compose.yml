@@ -1,0 +1,161 @@
+services:
+  # --- OBJECT STORAGE (The Lake) ---
+  minio:
+    image: minio/minio
+    container_name: ${MINIO_HOST}
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./data/minio:/data
+    command: server /data --console-address ":${MINIO_CONSOLE_INTERNAL_PORT}"
+    deploy:
+      resources:
+        limits:
+          memory: ${MINIO_MEM_LIMIT}
+    ports:
+      - "${MINIO_API_PORT}:${MINIO_INTERNAL_PORT}"
+      - "${MINIO_CONSOLE_PORT}:${MINIO_CONSOLE_INTERNAL_PORT}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:${MINIO_INTERNAL_PORT}/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- BUCKET INITIALIZATION ---
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://${MINIO_HOST}:${MINIO_INTERNAL_PORT} ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD}) do echo 'Waiting for MinIO...' && sleep 1; done;
+      /usr/bin/mc mb --ignore-existing myminio/warehouse;
+      exit 0;"
+
+  # --- ICEBERG REST CATALOG ---
+  iceberg-rest:
+    image: tabulario/iceberg-rest:latest
+    container_name: ${CATALOG_HOST}
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      CATALOG_WAREHOUSE: s3://warehouse/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://${MINIO_HOST}:${MINIO_INTERNAL_PORT}
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      CATALOG_S3_ACCESS__KEY__ID: ${MINIO_ROOT_USER}
+      CATALOG_S3_SECRET__ACCESS__KEY: ${MINIO_ROOT_PASSWORD}
+      AWS_REGION: ${AWS_REGION}
+    ports:
+      - "${CATALOG_PORT}:${CATALOG_INTERNAL_PORT}"
+
+  # --- TRINO SQL ENGINE ---
+  trino:
+    image: trinodb/trino:latest
+    container_name: ${TRINO_HOST}
+    environment:
+      # --- Catalog Mappings ---
+      - CATALOG_HOST=${CATALOG_HOST}
+      - CATALOG_INTERNAL_PORT=${CATALOG_INTERNAL_PORT}
+      - MINIO_HOST=${MINIO_HOST}
+      - MINIO_INTERNAL_PORT=${MINIO_INTERNAL_PORT}
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - AWS_REGION=${AWS_REGION}
+      
+      # --- JVM & Memory (Corrected Prefixes) ---
+      - TRINO_JVM_MAX_HEAP_SIZE=${TRINO_HEAP_MAX}
+      # Adding TRINO_CONFIG_ prefix lets Trino auto-configure itself
+      - TRINO_CONFIG_query.max-memory=${TRINO_QUERY_MAX_MEM}
+      - TRINO_CONFIG_query.max-total-memory=${TRINO_QUERY_MAX_TOTAL_MEM}
+      - TRINO_CONFIG_memory.heap-headroom-per-node=512MB
+    deploy:
+      resources:
+        limits:
+          memory: ${TRINO_MEM_LIMIT}
+    ports:
+      - "${TRINO_PORT}:${TRINO_INTERNAL_PORT}"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog
+
+
+  # --- METADATA DATABASE (Airflow) ---
+  airflow-db:
+    image: postgres:13
+    container_name: ${AIRFLOW_DB_HOST}
+    environment:
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASS}
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+    volumes:
+      - ./data/airflow_db:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEM_LIMIT}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER} -d ${AIRFLOW_DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- AIRFLOW ORCHESTRATOR ---
+  airflow:
+    build:
+      context: ./airflow
+      args:
+        AIRFLOW_IMAGE: ${AIRFLOW_IMAGE}
+    container_name: ${AIRFLOW_HOST}
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      trino:
+        condition: service_started
+    environment:
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASS}@${AIRFLOW_DB_HOST}:${POSTGRES_INTERNAL_PORT}/${AIRFLOW_DB_NAME}
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__FERNET_KEY=7Jpy81WAYr_fdhFdkPRZ65D1k152tgwrY2XK4w5j7eU=
+      - AIRFLOW_CONN_TRINO_CONN=trino://admin@${TRINO_HOST}:${TRINO_INTERNAL_PORT}/iceberg
+      
+      # --- THE FIX: PAUSE DAGS BY DEFAULT ---
+      - AIRFLOW__CORE__DTTM_PARSE_UNIT_TEST_MODE=False
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=True # <--- This is the key setting
+      
+      # --- RESOURCE MANAGEMENT ---
+      - AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL=30
+      - AIRFLOW__SCHEDULER__PARSING_PROCESSES=2
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+    ports:
+      - "${AIRFLOW_PORT}:${AIRFLOW_INTERNAL_PORT}"
+    deploy:
+      resources:
+        limits:
+          memory: ${AIRFLOW_MEM_LIMIT}
+    command: >
+      bash -c "airflow db init && 
+      airflow users create --username admin --firstname admin --lastname admin --role Admin --email admin@example.com --password admin && 
+      airflow webserver & airflow scheduler"
+
+  # --- JUPYTER EXPLORATION ---
+  jupyter:
+    image: jupyter/minimal-notebook
+    container_name: ${JUPYTER_HOST}
+    depends_on:
+      trino:
+        condition: service_started
+    volumes:
+      - ./notebooks:/home/jovyan/work
+    ports:
+      - "${JUPYTER_PORT}:${JUPYTER_INTERNAL_PORT}"
+    environment:
+      JUPYTER_TOKEN: ${JUPYTER_TOKEN}
+    deploy:
+      resources:
+        limits:
+          memory: ${JUPYTER_MEM_LIMIT}

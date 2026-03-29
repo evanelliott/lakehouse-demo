@@ -1,0 +1,41 @@
+# --- DATA & STORAGE (The Local Lake) ---
+# Never commit the physical data files or database state
+data/
+data/minio/*
+data/airflow_db/*
+
+# --- ORCHESTRATION ---
+# Ignore Airflow execution logs and metadata
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+
+# --- SECRETS & CONFIG ---
+# Your .env contains passwords and must NOT be committed
+.env
+# Keep .env.example committed as a template
+!.env.example
+
+# --- PYTHON & JUPYTER ---
+# Ignore Python cache, virtual environments and Jupyter checkpoints
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# --- DOCKER ---
+# Ignore Docker-specific temporary files
+.docker/
+
+# --- OS SPECIFIC ---
+# Ignore Mac-specific system files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon

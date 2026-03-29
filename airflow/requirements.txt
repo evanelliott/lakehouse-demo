@@ -1,0 +1,19 @@
+# --- AIRFLOW PROVIDERS ---
+# Essential for the TrinoOperator and managing connections
+apache-airflow-providers-trino==5.1.0
+
+# --- DATABASE CLIENTS ---
+# The underlying driver for Trino/Iceberg connectivity
+trino>=0.321.0
+
+# --- SCRAPING & WEB ---
+# Standard library for HTTP requests (used with Airflow native retries)
+requests>=2.31.0
+# parsing HTML to extract the embedded Understat JSON
+beautifulsoup4>=4.12.0
+
+# --- DATA UTILITIES ---
+# For local data manipulation if needed within PythonOperators
+pandas>=2.0.0
+# To handle .env files within our custom scripts
+python-dotenv>=1.0.0
