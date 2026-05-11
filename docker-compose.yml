@@ -1,0 +1,104 @@
+version: "3.8"
+
+x-airflow-common: &airflow-common
+  image: pl-lakehouse:latest
+  environment: &airflow-env
+    - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+    - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+    - S3_ENDPOINT=http://storage-provider:9000
+    - S3_BUCKET_NAME=lakehouse
+    - AWS_ACCESS_KEY_ID=admin
+    - AWS_SECRET_ACCESS_KEY=password123
+    - ICEBERG_CATALOG_URI=http://catalog-provider:8181
+  networks: [lakehouse-airgap]
+  depends_on:
+    postgres: { condition: service_healthy }
+
+services:
+  # --- STORAGE LAYER ---
+  minio:
+    image: minio/minio:latest
+    container_name: lakehouse_minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password123
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+    networks:
+      lakehouse-airgap:
+        aliases: [storage-provider]
+    profiles: [live, test] # Used in both to provide the S3 API
+
+  # --- ICEBERG CATALOG ---
+  iceberg-catalog:
+    image: tabulario/iceberg-rest:0.6.0
+    container_name: lakehouse_catalog
+    environment:
+      - CATALOG_WAREHOUSE=s3a://lakehouse/warehouse/
+      - CATALOG_S3_ENDPOINT=http://storage-provider:9000
+      - AWS_ACCESS_KEY_ID=admin
+      - AWS_SECRET_ACCESS_KEY=password123
+    depends_on:
+      minio: { condition: service_healthy }
+    networks:
+      lakehouse-airgap:
+        aliases: [catalog-provider]
+    profiles: [live, test]
+
+  # --- INFRASTRUCTURE BRAINS ---
+  postgres:
+    image: postgres:15-alpine
+    container_name: lakehouse_db
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASSWORD=airflow
+      - POSTGRES_DB=airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+    networks: [lakehouse-airgap]
+    profiles: [live]
+
+  # --- PRE-PUSH INTEGRATION RUNNER (Suggestion 4) ---
+  # This service does NOT mount the /src volume. 
+  # It tests the "baked-in" code to ensure the image is production-ready.
+  integration-tester:
+    <<: *airflow-common
+    container_name: lakehouse_pre_push_runner
+    volumes: [] # NO VOLUME MOUNTS - strictly tests the image build
+    command: pytest -m integration
+    profiles: [test]
+
+  # --- LIVE / LOCAL DEV UI ---
+  airflow-all-in-one:
+    <<: *airflow-common
+    container_name: lakehouse_airflow
+    command: >
+      bash -c "airflow db init && 
+      airflow users create 
+        --username admin 
+        --password admin 
+        --firstname Data 
+        --lastname Engineer 
+        --role Admin 
+        --email engineer@example.com && 
+      (airflow scheduler & airflow webserver)"
+    ports: ["8080:8080"]
+    volumes:
+      - ../src:/app/src # Volume mount for "Live" rapid feedback
+    networks:
+      - lakehouse-airgap
+      - lakehouse-live # Attached to internet for Periodic Smoke Tests
+    profiles: [live]
+
+networks:
+  lakehouse-airgap:
+    internal: true # SUGGESTION 3: No internet access for logic/plumbing tests
+  lakehouse-live:
+    driver: bridge # Allows internet access for periodic scrapers/smoke tests
+
+volumes:
+  minio_data:
+  postgres_data:

@@ -1,0 +1,56 @@
+{
+    "rosters": {
+        "h": {
+            "782798": {
+                "id": "782798",
+                "goals": "0",
+                "own_goals": "0",
+                "shots": "0",
+                "xG": "0",
+                "time": "90",
+                "player_id": "14056",
+                "team_id": "89",
+                "position": "GK",
+                "player": "Senne Lammens",
+                "h_a": "h",
+                "yellow_card": "0",
+                "red_card": "0",
+                "roster_in": "0",
+                "roster_out": "0",
+                "key_passes": "0",
+                "assists": "0",
+                "xA": "0",
+                "xGChain": "0.017660638317465782",
+                "xGBuildup": "0.017660638317465782",
+                "positionOrder": "1"
+            }
+        },
+        "a": {
+            "782798": {
+                "id": "782798",
+                "goals": "0",
+                "own_goals": "0",
+                "shots": "0",
+                "xG": "0",
+                "time": "90",
+                "player_id": "14056",
+                "team_id": "89",
+                "position": "GK",
+                "player": "Senne Lammens",
+                "h_a": "h",
+                "yellow_card": "0",
+                "red_card": "0",
+                "roster_in": "0",
+                "roster_out": "0",
+                "key_passes": "0",
+                "assists": "0",
+                "xA": "0",
+                "xGChain": "0.017660638317465782",
+                "xGBuildup": "0.017660638317465782",
+                "positionOrder": "1"
+            }
+        }
+    },
+    "shots": {},
+    "tmpl": {}
+}

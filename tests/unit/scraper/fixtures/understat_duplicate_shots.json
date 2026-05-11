@@ -1,0 +1,52 @@
+{
+    "rosters": {},
+    "shots": {
+        "h": [
+            {
+                "id": "678783",
+                "minute": "11",
+                "result": "SavedShot",
+                "X": "0.749000015258789",
+                "Y": "0.38799999237060545",
+                "xG": "0.017660638317465782",
+                "player": "Amad Diallo Traore",
+                "h_a": "h",
+                "player_id": "8127",
+                "situation": "OpenPlay",
+                "season": "2025",
+                "shotType": "LeftFoot",
+                "match_id": "29088",
+                "h_team": "Manchester United",
+                "a_team": "Leeds",
+                "h_goals": "1",
+                "a_goals": "2",
+                "date": "2026-04-13 19:00:00",
+                "player_assisted": "Casemiro",
+                "lastAction": "Chipped"
+            },
+            {
+                "id": "678783",
+                "minute": "11",
+                "result": "SavedShot",
+                "X": "0.749000015258789",
+                "Y": "0.38799999237060545",
+                "xG": "0.017660638317465782",
+                "player": "Amad Diallo Traore",
+                "h_a": "h",
+                "player_id": "8127",
+                "situation": "OpenPlay",
+                "season": "2025",
+                "shotType": "LeftFoot",
+                "match_id": "29088",
+                "h_team": "Manchester United",
+                "a_team": "Leeds",
+                "h_goals": "1",
+                "a_goals": "2",
+                "date": "2026-04-13 19:00:00",
+                "player_assisted": "Casemiro",
+                "lastAction": "Chipped"
+            }
+        ]
+    },
+    "tmpl": {}
+}

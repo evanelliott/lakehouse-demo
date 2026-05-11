@@ -1,0 +1,32 @@
+# --- Python & Tooling ---
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# --- Local Data & Lakehouse ---
+# We want Docker to stay light, so we ignore all local data state
+*.parquet
+*.csv
+*.db
+*.db.wal
+data/
+logs/
+spark-warehouse/
+metastore_db/
+derby.log
+uv.lock
+
+# --- Git & CI ---
+.git/
+.github/
+README.md
+
+# --- Docker Specifics ---
+# Prevents host-specific docker state from interfering with the build
+docker/volumes/
+minio_data/
+.minio.sys/

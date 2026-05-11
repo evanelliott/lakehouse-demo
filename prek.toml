@@ -1,0 +1,10 @@
+[[repos]]
+repo = "local"
+hooks = [
+    { id = "pre-commit", name = "Shift-Left Gate", language = "system", entry = "bash scripts/pre_commit.sh", stages = [
+        "commit",
+    ] },
+    { id = "pre-push", name = "Production Gate", language = "system", entry = "bash scripts/pre_commit.sh", stages = [
+        "push",
+    ] },
+]

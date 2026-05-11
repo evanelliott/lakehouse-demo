@@ -1,0 +1,42 @@
+# --- Python / uv / Tooling ---
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- Environment & Secrets ---
+.env
+.env.*
+*.env
+
+# --- Data & Lakehouse ---
+# Ignore all raw/local data except for our verified governance layer
+*.parquet
+!src/governance/*.parquet
+!src/governance/*.csv
+data/
+logs/
+*.db
+*.db.wal
+
+# --- Spark / Java ---
+metastore_db/
+spark-warehouse/
+derby.log
+*.jar
+*.log
+
+# --- Docker & DevContainer ---
+.devcontainer/*.local.json
+minio_data/
+.minio.sys/
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+# --- Other ---
+/_legacy
