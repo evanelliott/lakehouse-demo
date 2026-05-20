@@ -1,5 +1,13 @@
 # ToDo List
 
+- Finish adding new scraper test cases including fixtures and cassettes
+- Remove old scraper test cases and any unused code
+- Maybe then move on to integration tests?
+
+
+
+
+
 Next Steps
 - Contracts - bronze layer, silver dim_injuries scd2
 - Unit Tests - Idempotency (bronze layer, silver dim_injuries scd2)

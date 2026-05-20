@@ -1,3 +1,6 @@
+# =========================================================================
+# SYSTEM & TOOLING GATES
+# =========================================================================
 # --- Python / uv / Tooling ---
 .venv/
 __pycache__/
@@ -7,10 +10,28 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+
+
+# =========================================================================
+# SECURITY & PLATFORM BOUNDARIES
+# =========================================================================
 # --- Environment & Secrets ---
 .env
 .env.*
 *.env
+
+
+# =========================================================================
+# TESTING & DATA LAKE DEFENSTIVE ASSETS
+# =========================================================================
+# --- Testing Assets & Cassettes ---
+# DO NOT ignore your text-based VCR cassettes or static extraction fixtures.
+# They act as your immutable offline logic validator contracts.
+!tests/unit/scraper/fixtures/*
+!tests/unit/scraper/cassettes/**/*.yaml
 
 # --- Data & Lakehouse ---
 # Ignore all raw/local data except for our verified governance layer
@@ -22,6 +43,10 @@ logs/
 *.db
 *.db.wal
 
+
+# =========================================================================
+# INFRASTRUCTURE SIMULATION PROFILES
+# =========================================================================
 # --- Spark / Java ---
 metastore_db/
 spark-warehouse/
@@ -33,10 +58,6 @@ derby.log
 .devcontainer/*.local.json
 minio_data/
 .minio.sys/
-
-# --- OS Specific ---
-.DS_Store
-Thumbs.db
 
 # --- Other ---
 /_legacy

@@ -81,9 +81,6 @@ def test_job_idempotency(spark):
 
 | ID | Focus | Type | Key Assertion |
 |---|---|---|---|
-| U-SCR-01,02 | Extraction | Positive | Matches Expected Object |
-| U-SCR-03,04 | DOM Drift | Negative | Raises SourceDataMissingError |
-| U-SCR-05,06 | Data Duplication | Negative | Raises IntraBatchDuplicateError |
 | U-ENT-01,03 | ER Success | Positive | Returns correct team_id |
 | U-ENT-02,04 | ER Gate | Negative | Raises UnresolvedEntityError |
 | U-SCD-01,02,03 | SCD2 Logic | Positive | Handles New and Status Transitions |
@@ -92,15 +89,9 @@ def test_job_idempotency(spark):
 | U-IDM-01 | Idempotency | Positive | Second execution is a No-Op |
 
 ------------------------------
-## Detailed Unit Test descriptions
+## Data Transformation Unit Test descriptions
 | ID | Name | Area | Type | Gherkin |
 |---|---|---|---|---|
-| U-SCR-01 | Understat Match Extraction | Scraper | Positive | Given a valid Understat HTML snapshot When the parser runs Then the output dictionary must match a hard-coded "Expected Object" representing the snapshot's data. |
-| U-SCR-02 | PremierInjuries Table Extraction | Scraper | Positive | Given a valid PremierInjuries HTML snapshot When the parser runs Then the output list must match a hard-coded "Expected List" representing the snapshot's data. |
-| U-SCR-03 | Understat DOM Contract Change | Scraper | Negative | Given an Understat page where the data script tag is missing/renamed When the selector fails to find the block Then it should raise a SourceDataMissingError. |
-| U-SCR-04 | PremierInjuries DOM Contract Change | Scraper | Negative | Given a PremierInjuries page where the table classes have changed When the row selector returns 0 items Then it should raise a SelectorNotFoundError. |
-| U-SCR-05 | Understat Intra-Batch Duplicate | Scraper | Negative | Given an Understat match report where an entity (e.g. a specific shot) appears twice When the parser extracts the payload Then it must raise an IntraBatchDuplicateError and halt extraction. |
-| U-SCR-06 | PremierInjuries Intra-Batch Duplicate | Scraper | Negative | Given a PremierInjuries page where a player is listed twice in the same injury table When the parser extracts the payload Then it must raise an IntraBatchDuplicateError and halt extraction. |
 | U-ENT-01 | Team ID Success | Entity Resolution | Positive | Given a raw input DataFrame and a lookup DataFrame fixture When an equality join is performed via Spark Connect Then the resulting DataFrame should contain the mapped team_id. |
 | U-ENT-02 | Team ID Hard-Fail | Entity Resolution | Negative | Given an input DataFrame with a name missing from the lookup DataFrame When the transformation logic detects a null join result Then it must raise an UnresolvedEntityError immediately. |
 | U-ENT-04 | Player ID Success | Entity Resolution | Positive | Given a raw input DataFrame and a lookup DataFrame fixture When an equality join is performed via Spark Connect Then the resulting DataFrame should contain the mapped player_id. |
@@ -112,3 +103,67 @@ def test_job_idempotency(spark):
 | U-SCD-05 | SCD2 Injury Timeline Discrepancy | SCD2 | Negative | Given an incoming record that creates a logical conflict with an existing timeline (e.g. overlapping active periods with different statuses) When processed Then it must raise an SCD2TimelineException to prevent history corruption. |
 | U-SCD-06 | SCD2 Injury Future-Date Gate | SCD2 | Negative | Given a record with an effective_date that is in the future relative to the processing date When processed Then it should raise a FutureDateError and halt the Spark job. |
 | U-IDM-01 | Global Idempotency Contract | Idempotency | Positive | Given the transformation function transform_func When it is executed twice against the same mock data via Spark Connect Then the second run must yield a state identical to the first. |
+
+------------------------------
+...d
+------------------------------
+
+# Scraper Unit Test Specification Matrix.
+It reflects your three-character module architecture (UTL, NET, SCR), isolates your shared core utilities, splits your positive extraction tests, parameterizes negative gates, and enforces your required error-handling responses.
+
+------------------------------
+## 🛠️ 1. Shared Core Utilities Test Registry (U-UTL-xx)
+
+* Scope: Universal data validation and sanitisation engines.
+* Execution: Tested once globally; shared across all ingestion pipelines to guarantee DRY compliance.
+
+| ID | Focus Area | Type | Expected Behaviour / Key Assertion |
+|---|---|---|---|
+| U-UTL-01 | Full Duplicates | Positive | Identical overlapping dictionary rows are cleanly deduplicated without alerts. |
+| U-UTL-02 | PK Duplicates | Negative | Primary key collisions with differing attributes raises an IntraBatchDuplicateError. |
+| U-UTL-03 | String Sanitisation | Positive | Central sanitiser cleanly trims trailing \n line breaks and strips HTML whitespaces. |
+
+------------------------------
+## 📡 2. Network Handshake Unit Test Registry (U-NET-xx)
+
+* Scope: Cookie lifecycle execution, custom browser header compliance, and network status gates.
+* Execution: 100% offline verification utilizing pre-recorded VCR cassettes via pytest-recording.
+
+| ID | Data Source | Focus Area | Type | Expected Behaviour / Key Assertion |
+|---|---|---|---|---|
+| U-NET-01 | Understat | Handshake Success | Positive | Returns a 200 OK status code with the correct JSON mime-type payload. |
+| U-NET-02 | Understat | Session Rejected | Negative | Intercept non-200 response and raise explicit security exception. |
+| U-NET-03 | Understat | Header Drop | Negative | Catch the 403 forbidden status code and raise a clear exception. |
+| U-NET-04 | Understat | Rate Limited | Negative | Detect the rate limit, reject the payload, and raise a specific exception. |
+| U-NET-05 | Understat | Server Outage | Negative | Catch the timeout or server error and raise a clear exception. |
+| U-NET-06 | Premier Injuries | Handshake Success | Positive | Returns a 200 OK status code with the correct HTML text payload. |
+| U-NET-07 | Premier Injuries | Header Drop | Negative | Catch the 403 forbidden status code and raise a clear exception. |
+| U-NET-08 | Premier Injuries | Rate Limited | Negative | Detect the rate limit, reject the payload, and raise a specific exception. |
+| U-NET-09 | Premier Injuries | Server Outage | Negative | Catch the timeout or server error and raise a clear exception. |
+
+------------------------------
+## ⚽ 3. Data Extraction Unit Test Registry (U-SCR-xx)
+
+* Scope: Payload envelope validation, dictionary mapping, schema stability, and DOM layout drift monitoring.
+* Execution: 100% stateless execution utilizing local static fixture snapshots (.json and .html).
+
+| ID | Data Source | Focus / Dataset | Type | Expected Behaviour / Key Assertion |
+|---|---|---|---|---|
+| U-EXT-01 | Understat | Ingestion: League | Positive | Maps raw JSON to clean Bronze schemas for Teams, Players, and Dates. |
+| U-EXT-02 | Understat | Ingestion: Match | Positive | Maps raw JSON to clean Bronze schemas for Rosters and Shots. |
+| U-EXT-03 | All | Missing ID Key | Negative | Missing core envelope root keys in responses raises a SourceDataMissingError. |
+| U-EXT-04 | All | Missing Fields | Negative | Missing internal dictionary schema items drops the batch and raises a ValueError. |
+| U-EXT-05 | All | Empty Payload | Negative | Completely empty data arrays inside responses raises a ValueError. |
+| U-EXT-06 | AllS | Schema Type | Negative | Mismatched data types that cannot be safely cast throws an explicit TypeError. |
+| U-EXT-07 | Premier Injuries | Grid Ingestion | Positive | Maps DOM table structure rows cleanly into structured player injury records. |
+| U-EXT-08 | Premier Injuries | Table Layout Drift | Negative | Table class or grid node modifications catch empty selector lists and raise SelectorNotFoundError. |
+
+------------------------------
+## 🚀 Ready to Transition to Implementation
+Your architectural plans are complete. We have successfully addressed formatting boundaries, decoupled the networking layers, and mapped out edge cases.
+Let me know how you would like to proceed:
+
+* Do you want to implement the shared utility code for test_deduplication.py (U-UTL-01 to 03) using PyTest parameters?
+* Or would you prefer to see the network mock structure for test_understat.py (U-NET-01 to 05)?
+
+
