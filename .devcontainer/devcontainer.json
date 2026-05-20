@@ -6,7 +6,7 @@
   "initializeCommand": "bash .devcontainer/fetch_jars.sh",
   "postCreateCommand": "bash .devcontainer/dev_setup.sh",
   // FIX: Run your git registration and your new background daemon cleanly in sequence
-  "postStartCommand": "bash -i -l -c 'bash .devcontainer/start_spark_connect.sh'",
+  "postStartCommand": "bash .devcontainer/start_spark_connect.sh",
   "userEnvProbe": "loginShell",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
