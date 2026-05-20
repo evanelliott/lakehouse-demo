@@ -20,7 +20,6 @@ def spark() -> Generator[SparkSession, None, None]:
     Dynamic Spark Session Fixture with strict hang guards.
     """
     is_integration = os.environ.get("INTEGRATION_TEST_MODE", "false").lower() == "true"
-    # Fall back to None if the variable wasn't injected correctly
     spark_remote = os.environ.get("SPARK_REMOTE")
 
     if not is_integration:
@@ -65,7 +64,6 @@ def spark() -> Generator[SparkSession, None, None]:
 
     yield session
 
-    # 2. Cleanup operations between comprehensive test suite runs
     try:
         session.catalog.clearCache()
     except Exception:
@@ -105,7 +103,12 @@ def pytest_configure(config: "Config") -> None:
     """
     Registers custom markers to allow for targeted testing via prek.
     """
-    config.addinivalue_line("markers", "scraper: tests for extraction logic")
+    # 3-Character Scraper & Utility Framework Markers
+    config.addinivalue_line("markers", "utl: global core validation and sanitisation tests")
+    config.addinivalue_line("markers", "net: network handshake and api connection tests")
+    config.addinivalue_line("markers", "scr: data extraction and dictionary parsing tests")
+
+    # Downstream Warehouse Progression Markers
     config.addinivalue_line("markers", "scd2: tests for temporal/history logic")
     config.addinivalue_line("markers", "idempotency: tests for re-run reliability")
     config.addinivalue_line("markers", "entity_resolution: tests for entity validation checks")

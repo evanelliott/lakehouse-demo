@@ -34,8 +34,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - lakehouse-airgap
-    depends_on:
-      - spark-connect
 
   # =========================================================================
   # TIER 2: EPHEMERAL STATEFUL INFRASTRUCTURE (Profile: test)

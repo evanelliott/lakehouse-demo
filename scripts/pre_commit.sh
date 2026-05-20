@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# scripts/pre_commit.sh
-set -e
+# ./scripts/pre_commit.sh
+
+# --- AUTOMATIC SPARK CONNECT GUARD ---
+if ! ps aux | grep -v grep | grep -q "SparkConnectServer"; then
+    echo "⚠️  Spark Connect Daemon is offline. Booting it now..."
+    bash .devcontainer/start_spark_connect.sh
+fi
+# -------------------------------------
 
 echo "========================================================================"
 echo "🔍 Initiating Fast Unit Gate (pre-commit)..."
