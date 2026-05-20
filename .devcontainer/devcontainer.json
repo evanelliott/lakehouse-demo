@@ -3,10 +3,11 @@
   "dockerComposeFile": "../docker-compose.yml",
   "service": "devcontainer",
   "workspaceFolder": "/app",
-  
-  "postCreateCommand": "bash scripts/dev_setup.sh",
-  "postStartCommand": "git config --global --add safe.directory /app",
-  
+  "initializeCommand": "bash .devcontainer/fetch_jars.sh",
+  "postCreateCommand": "bash .devcontainer/dev_setup.sh",
+  // FIX: Run your git registration and your new background daemon cleanly in sequence
+  "postStartCommand": "bash .devcontainer/start_spark_connect.sh",
+  "userEnvProbe": "loginShell",
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {
       "version": "latest"
@@ -24,7 +25,9 @@
       ],
       "settings": {
         "python.defaultInterpreterPath": "/opt/venv/bin/python3",
-        "python.analysis.extraPaths": ["/app"],
+        "python.analysis.extraPaths": [
+          "/app"
+        ],
         "python.testing.pytestEnabled": true,
         "telemetry.telemetryLevel": "off",
         "editor.formatOnSave": true,
@@ -38,7 +41,7 @@
   "containerEnv": {
     "PYTHONPATH": "/app",
     "PYARROW_IGNORE_TIMEZONE": "1",
-    "SPARK_LOCAL_IP": "127.0.0.1"
+    "SPARK_REMOTE": "sc://localhost:15002"
   },
   "remoteUser": "vscode"
 }

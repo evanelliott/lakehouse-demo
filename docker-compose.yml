@@ -1,5 +1,6 @@
-version: "3.8"
-
+# =========================================================================
+# ANCHORS & COMMON CONFIGURATION
+# =========================================================================
 x-airflow-common: &airflow-common
   image: pl-lakehouse:latest
   environment: &airflow-env
@@ -11,13 +12,13 @@ x-airflow-common: &airflow-common
     - AWS_SECRET_ACCESS_KEY=password123
     - ICEBERG_CATALOG_URI=http://catalog-provider:8181
     - PYARROW_IGNORE_TIMEZONE=1
-  networks: [lakehouse-airgap]
+  networks: [ lakehouse-airgap ]
   depends_on:
     postgres: { condition: service_healthy }
 
 services:
   # =========================================================================
-  # CORE DEVELOPER BOUNDARY (Baseline Workstation Service)
+  # TIER 1: CORE DEVELOPER WORKSPACE & FAST UNIT TESTING (Always On)
   # =========================================================================
   devcontainer:
     image: pl-lakehouse:latest
@@ -33,9 +34,11 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - lakehouse-airgap
+    depends_on:
+      - spark-connect
 
   # =========================================================================
-  # PLATFORM STORAGE LAYERS
+  # TIER 2: EPHEMERAL STATEFUL INFRASTRUCTURE (Profile: test)
   # =========================================================================
   minio:
     image: minio/minio:latest
@@ -45,23 +48,29 @@ services:
       - MINIO_ROOT_PASSWORD=password123
     command: server /data --console-address ":9001"
     ports:
-      - "9000:9000" 
-      - "9001:9001" 
+      - "9000:9000"
+      - "9001:9001"
     volumes:
-      - /data    # Ephemeral anonymous volume: wipes automatically on down commands
+      - /data # Wipes entirely on down commands to keep tests completely stateless
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 2s # Aggressive health checks to minimize pre-push hook spin-up latency
+      timeout: 2s
+      retries: 5
     networks:
       lakehouse-airgap:
-        aliases: [storage-provider]
-    profiles: [live, test]
+        aliases: [ storage-provider ]
+    profiles: [ test, live ]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   iceberg-catalog:
     image: apache/iceberg-rest-fixture:latest
     container_name: lakehouse_catalog
     ports:
-      - "8181:8181" 
+      - "8181:8181"
     environment:
       - CATALOG_WAREHOUSE=s3a://lakehouse/warehouse/
       - CATALOG_S3_ENDPOINT=http://storage-provider:9000
@@ -71,9 +80,23 @@ services:
       minio: { condition: service_healthy }
     networks:
       lakehouse-airgap:
-        aliases: [catalog-provider]
-    profiles: [live, test]
+        aliases: [ catalog-provider ]
+    profiles: [ test, live ]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
 
+  integration-tester:
+    <<: *airflow-common
+    container_name: lakehouse_pre_push_runner
+    volumes: []
+    command: pytest -m integration
+    profiles: [ test ]
+
+  # =========================================================================
+  # TIER 3: PRODUCTION STACK SIMULATION (Profile: live)
+  # =========================================================================
   postgres:
     image: postgres:15-alpine
     container_name: lakehouse_db
@@ -82,29 +105,26 @@ services:
       - POSTGRES_PASSWORD=airflow
       - POSTGRES_DB=airflow
     volumes:
-      - /var/lib/postgresql/data 
+      - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "airflow"]
+      test: [ "CMD", "pg_isready", "-U", "airflow" ]
       interval: 5s
-    networks: [lakehouse-airgap]
-    profiles: [live]
-
-  # =========================================================================
-  # PIPELINE ORCHESTRATION & RUNNERS
-  # =========================================================================
-  integration-tester:
-    <<: *airflow-common
-    container_name: lakehouse_pre_push_runner
-    volumes: []
-    command: pytest -m integration
-    profiles: [test]
+    networks: [ lakehouse-airgap ]
+    profiles: [ live ]
+    deploy:
+      resources:
+        limits:
+          memory: 1g
 
   airflow-all-in-one:
     <<: *airflow-common
     container_name: lakehouse_airflow
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      target: runtime # Swaps directly to lean production stage (removes pytest/ruff/mypy)
     command: >
-      bash -c "airflow db init && 
-      airflow users create 
+      bash -c "airflow db init &&  airflow users create 
         --username admin 
         --password admin 
         --firstname Data 
@@ -112,19 +132,23 @@ services:
         --role Admin 
         --email engineer@example.com && 
       (airflow scheduler & airflow webserver)"
-    ports: ["8080:8080"]
+    ports: [ "8080:8080" ]
     volumes:
       - ./src:/app/src
     networks:
       - lakehouse-airgap
       - lakehouse-live
-    profiles: [live]
+    profiles: [ live ]
+    deploy:
+      resources:
+        limits:
+          memory: 5g # Capped to safeguard your 16GB RAM constraint
 
 # =========================================================================
-# NETWORK FABRIC REGISTRY
+# NETWORKING REGISTRY
 # =========================================================================
 networks:
   lakehouse-airgap:
-    internal: true # Air-gapped barrier ensuring total sandbox isolation
+    internal: true # Total sandbox isolation for development hooks
   lakehouse-live:
-    driver: bridge # Public bridge channel allocated for Live deployment actions
+    driver: bridge # Allocated for live web-scraping components

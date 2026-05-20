@@ -37,15 +37,18 @@ def load_silver_injuries(initial_df: DataFrame, batch_df: DataFrame) -> DataFram
             .drop("effective_date")
         )
 
-    # 2. THE IDEMPOTENCY FILTER: Drop incoming records that are already identical
-    # to an active, matching open-ended record in the historical state matrix.
-    deduped_batch = batch_df.join(
-        initial_df.filter(F.col("valid_to") == "9999-12-31"),
-        (batch_df.player_id == initial_df.player_id)
-        & (batch_df.status == initial_df.status)
-        & (batch_df.effective_date == initial_df.valid_from),
+    # Enforce clear structural alias boundaries to completely eliminate lineage clashing
+    hist_alias = initial_df.alias("hist")
+    delta_alias = batch_df.alias("delta")
+
+    # 2. THE IDEMPOTENCY FILTER: Resolved via qualified string target paths
+    deduped_batch = delta_alias.join(
+        hist_alias.filter(F.col("hist.valid_to") == "9999-12-31"),
+        (F.col("delta.player_id") == F.col("hist.player_id"))
+        & (F.col("delta.status") == F.col("hist.status"))
+        & (F.col("delta.effective_date") == F.col("hist.valid_from")),
         "left_anti",
-    )
+    ).select("delta.*")  # Ensure the output context retains pure un-aliased batch structure
 
     # If the delta stream is empty after filtering, return initial state completely untouched
     if deduped_batch.isEmpty():
@@ -56,7 +59,6 @@ def load_silver_injuries(initial_df: DataFrame, batch_df: DataFrame) -> DataFram
     unchanged_records = initial_df.join(deduped_batch, on="player_id", how="left_anti")
 
     # Capture open records that require a timeline split due to status modifications.
-    # FIX: Drop the incoming duplicate status from the batch data frame to clear ambiguity.
     records_to_expire = initial_df.filter(F.col("valid_to") == "9999-12-31").join(
         deduped_batch.select("player_id", "effective_date"), on="player_id", how="inner"
     )

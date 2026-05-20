@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{ name = "Data Engineer", email = "engineer@example.com" }]
 dependencies = [
-    "pyspark[connect]>=3.5.0,<3.6.0",       # FIX: Pin minor bounds to maintain core alignment with Airflow
+    "pyspark[connect]>=3.5.0,<3.6.0",      # Pinned minor bounds to maintain core alignment with Airflow
     "grpcio-status>=1.48.1",
     "numpy<2.0.0",
     "duckdb>=0.10.0",
@@ -21,7 +21,7 @@ dependencies = [
     "requests>=2.31.0",
     "beautifulsoup4>=4.12.0",
     "cryptography<47.0.0",
-    "apache-airflow>=2.8.0,<2.9.0",        # FIX: Protect package mapping layout against version collision
+    "apache-airflow>=2.8.0,<2.9.0",        # Protect package mapping layout against version collision
     "apache-airflow-providers-common-sql",
     "apache-airflow-providers-amazon",
 ]
@@ -29,8 +29,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
+    "pytest-env>=1.1.0",
     "pytest-mock>=3.12.0",
-    "pytest-recording>=0.13.0", # FIX: Added VCR cassette engine for offline parser testing
+    "pytest-recording>=0.13.0", # VCR cassette engine for offline parser testing
     "responses>=0.25.0",
     "pyiceberg[s3fs]>=0.6.0",
     "ruff>=0.3.0",
@@ -64,8 +65,7 @@ warn_return_any = true
 module = "tests.*"
 disallow_untyped_defs = true
 
-# FIX: Added Airflow library skips. This prevents strict Mypy rule evaluation
-# from throwing type errors on native Airflow operators and imports during commit hooks.
+# Prevent strict Mypy rule evaluation from throwing type errors on native Airflow operators
 [[tool.mypy.overrides]]
 module = "airflow.*"
 ignore_missing_imports = true
@@ -82,14 +82,21 @@ fixable = ["ALL"]
 [tool.pytest.ini_options]
 testpaths = ["."]
 python_files = "test_*.py"
-addopts = "-m 'not integration'"
-markers = ["integration: marks tests that require Docker/MinIO services"]
-# FIX: Added an extra warning block filter to suppress downstream VCR py312 framework deprecation notifications
+addopts = "-m 'not integration' --disable-warnings"
+markers = [
+    "integration: marks tests that require Docker/MinIO/Iceberg services",
+]
+env = [
+    "SPARK_REMOTE=sc://localhost:15002", # FIX: Routes cleanly over the native local loopback
+    "PYARROW_IGNORE_TIMEZONE=1",
+]
+# Suppress downstream VCR and third-party framework deprecation notifications
 filterwarnings = [
+    "ignore:.*utcnow.*:DeprecationWarning",
+    "ignore:The.__version__.attribute is deprecated:DeprecationWarning",
     "ignore:Stealth has already been applied:UserWarning",
     "ignore:.*vcr.*:DeprecationWarning",
     "ignore:.*distutils.*:DeprecationWarning",
-    "ignore:.*__version__.*attribute is deprecated.*:DeprecationWarning:airflow.utils.timezone"
 ]
 
 [build-system]

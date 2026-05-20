@@ -1,10 +1,8 @@
 # tests/unit/conftest.py
 import os
-import time
 from typing import TYPE_CHECKING, Generator
 
 import pytest
-from py4j.protocol import Py4JNetworkError
 from pyspark.sql import SparkSession
 
 if TYPE_CHECKING:
@@ -16,47 +14,60 @@ if TYPE_CHECKING:
 # --- ENGINE FIXTURES ---
 
 
-# tests/unit/conftest.py
-
-
 @pytest.fixture(scope="session")
 def spark() -> Generator[SparkSession, None, None]:
-    """Provides a stable, high-memory embedded local Spark session for unit tests.
-
-    Handles rapid socket reclamation loops and resilient process teardowns cleanly.
     """
-    if "JAVA_HOME" in os.environ:
-        del os.environ["JAVA_HOME"]
+    Dynamic Spark Session Fixture with strict hang guards.
+    """
+    is_integration = os.environ.get("INTEGRATION_TEST_MODE", "false").lower() == "true"
+    # Fall back to None if the variable wasn't injected correctly
+    spark_remote = os.environ.get("SPARK_REMOTE")
 
-    # Allocate 4GB heap space pool natively before boot
-    os.environ["PYSPARK_SUBMIT_ARGS"] = "--driver-memory 4g pyspark-shell"
+    if not is_integration:
+        if not spark_remote:
+            raise RuntimeError("CRITICAL: SPARK_REMOTE environment variable is missing!")
 
-    for attempt in range(3):
-        try:
-            session = (
-                SparkSession.builder.master("local[*]")
-                .appName("StatelessUnitTesting")
-                .config("spark.driver.bindAddress", "127.0.0.1")
-                .config("spark.ui.showConsoleProgress", "false")
-                .config("spark.sql.shuffle.partitions", "1")
-                .config("spark.default.parallelism", "1")
-                .config("spark.ui.enabled", "false")
-                .config("spark.driver.log.level", "WARN")
-                .getOrCreate()
-            )
-            break
-        except (ConnectionRefusedError, Py4JNetworkError):
-            if attempt == 2:
-                raise
-            time.sleep(0.5)
+        # FIX: Appending the forward-slash safely allows ChannelBuilder to parse options
+        remote_url = f"{spark_remote}/;timeout=5000;user_agent=pytest"
+        print(f"📡 Connecting to Spark Connect daemon at: {remote_url}")
+
+        session = SparkSession.builder.remote(remote_url).getOrCreate()
+
+    else:
+        # -----------------------------------------------------------------
+        # INTEGRATION TEST WORKFLOW (Stateful Mock Infra Mode)
+        # -----------------------------------------------------------------
+        # Builds a local JVM executor capable of resolving Iceberg and S3A protocols.
+        # JARs are loaded automatically because they are symlinked in the Dockerfile.
+        sql_exts = "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        lakehouse_uri = os.environ.get("ICEBERG_CATALOG_URI", "http://catalog-provider:8181")
+        s3_endpoint = os.environ.get("S3_ENDPOINT", "http://storage-provider:9000")
+        s3_access_key = os.environ.get("AWS_ACCESS_KEY_ID", "admin")
+        s3_secret_key = os.environ.get("AWS_SECRET_ACCESS_KEY", "password123")
+        session = (
+            SparkSession.builder.master("local[*]")
+            .appName("lakehouse-integration-suite")
+            .config("spark.sql.shuffle.partitions", "1")
+            .config("spark.default.parallelism", "1")
+            .config("spark.sql.extensions", sql_exts)
+            .config("spark.sql.catalog.lakehouse", "org.apache.iceberg.spark.SparkCatalog")
+            .config("spark.sql.catalog.lakehouse.type", "rest")
+            .config("spark.sql.catalog.lakehouse.uri", lakehouse_uri)
+            .config("spark.sql.catalog.lakehouse.warehouse", "s3a://lakehouse/warehouse/")
+            .config("spark.sql.catalog.lakehouse.io-impl", "org.apache.iceberg.aws.s3.S3FileIO")
+            .config("spark.hadoop.fs.s3a.endpoint", s3_endpoint)
+            .config("spark.hadoop.fs.s3a.access.key", s3_access_key)
+            .config("spark.hadoop.fs.s3a.secret.key", s3_secret_key)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+            .getOrCreate()
+        )
 
     yield session
 
-    # FIX: Safety wrap the teardown phase. If an upstream negative validation test
-    # forced the local JVM background process to terminate or panic early,
-    # we catch the socket drop cleanly to prevent teardown exit code crashes.
+    # 2. Cleanup operations between comprehensive test suite runs
     try:
-        session.stop()
+        session.catalog.clearCache()
     except Exception:
         pass
 

@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .ipynb_checkpoints/
+!.devcontainer/.cache-jars/
 
 # --- Local Data & Lakehouse ---
 # We want Docker to stay light, so we ignore all local data state
