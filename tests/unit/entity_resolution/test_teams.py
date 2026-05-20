@@ -3,9 +3,9 @@ from typing import Any, Iterable, cast
 
 import pytest
 from pyspark.sql import SparkSession
-from src.transforms.entity_resolution import resolve_team_entities
 
 from src.exceptions import UnresolvedEntityError
+from src.transforms.entity_resolution import resolve_team_entities
 
 
 @pytest.mark.entity_resolution

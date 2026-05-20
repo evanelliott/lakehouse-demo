@@ -10,12 +10,33 @@ x-airflow-common: &airflow-common
     - AWS_ACCESS_KEY_ID=admin
     - AWS_SECRET_ACCESS_KEY=password123
     - ICEBERG_CATALOG_URI=http://catalog-provider:8181
+    - PYARROW_IGNORE_TIMEZONE=1
   networks: [lakehouse-airgap]
   depends_on:
     postgres: { condition: service_healthy }
 
 services:
-  # --- STORAGE LAYER ---
+  # =========================================================================
+  # CORE DEVELOPER BOUNDARY (Baseline Workstation Service)
+  # =========================================================================
+  devcontainer:
+    image: pl-lakehouse:latest
+    container_name: lakehouse-dev-container
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+      target: development
+    tty: true
+    stdin_open: true
+    volumes:
+      - .:/app:cached
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - lakehouse-airgap
+
+  # =========================================================================
+  # PLATFORM STORAGE LAYERS
+  # =========================================================================
   minio:
     image: minio/minio:latest
     container_name: lakehouse_minio
@@ -23,18 +44,24 @@ services:
       - MINIO_ROOT_USER=admin
       - MINIO_ROOT_PASSWORD=password123
     command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000" 
+      - "9001:9001" 
+    volumes:
+      - /data    # Ephemeral anonymous volume: wipes automatically on down commands
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
     networks:
       lakehouse-airgap:
         aliases: [storage-provider]
-    profiles: [live, test] # Used in both to provide the S3 API
+    profiles: [live, test]
 
-  # --- ICEBERG CATALOG ---
   iceberg-catalog:
-    image: tabulario/iceberg-rest:0.6.0
+    image: apache/iceberg-rest-fixture:latest
     container_name: lakehouse_catalog
+    ports:
+      - "8181:8181" 
     environment:
       - CATALOG_WAREHOUSE=s3a://lakehouse/warehouse/
       - CATALOG_S3_ENDPOINT=http://storage-provider:9000
@@ -47,7 +74,6 @@ services:
         aliases: [catalog-provider]
     profiles: [live, test]
 
-  # --- INFRASTRUCTURE BRAINS ---
   postgres:
     image: postgres:15-alpine
     container_name: lakehouse_db
@@ -55,23 +81,24 @@ services:
       - POSTGRES_USER=airflow
       - POSTGRES_PASSWORD=airflow
       - POSTGRES_DB=airflow
+    volumes:
+      - /var/lib/postgresql/data 
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
     networks: [lakehouse-airgap]
     profiles: [live]
 
-  # --- PRE-PUSH INTEGRATION RUNNER (Suggestion 4) ---
-  # This service does NOT mount the /src volume. 
-  # It tests the "baked-in" code to ensure the image is production-ready.
+  # =========================================================================
+  # PIPELINE ORCHESTRATION & RUNNERS
+  # =========================================================================
   integration-tester:
     <<: *airflow-common
     container_name: lakehouse_pre_push_runner
-    volumes: [] # NO VOLUME MOUNTS - strictly tests the image build
+    volumes: []
     command: pytest -m integration
     profiles: [test]
 
-  # --- LIVE / LOCAL DEV UI ---
   airflow-all-in-one:
     <<: *airflow-common
     container_name: lakehouse_airflow
@@ -87,18 +114,17 @@ services:
       (airflow scheduler & airflow webserver)"
     ports: ["8080:8080"]
     volumes:
-      - ../src:/app/src # Volume mount for "Live" rapid feedback
+      - ./src:/app/src
     networks:
       - lakehouse-airgap
-      - lakehouse-live # Attached to internet for Periodic Smoke Tests
+      - lakehouse-live
     profiles: [live]
 
+# =========================================================================
+# NETWORK FABRIC REGISTRY
+# =========================================================================
 networks:
   lakehouse-airgap:
-    internal: true # SUGGESTION 3: No internet access for logic/plumbing tests
+    internal: true # Air-gapped barrier ensuring total sandbox isolation
   lakehouse-live:
-    driver: bridge # Allows internet access for periodic scrapers/smoke tests
-
-volumes:
-  minio_data:
-  postgres_data:
+    driver: bridge # Public bridge channel allocated for Live deployment actions

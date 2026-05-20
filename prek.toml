@@ -1,10 +1,13 @@
 [[repos]]
 repo = "local"
 hooks = [
-    { id = "pre-commit", name = "Shift-Left Gate", language = "system", entry = "bash scripts/pre_commit.sh", stages = [
+    # 1. Fast Internal Code Gate (Runs automatically on every local git commit inside the DevContainer)
+    { id = "pre-commit", name = "Fast Unit Gate", language = "system", entry = "bash scripts/pre_commit.sh", stages = [
         "commit",
     ] },
-    { id = "pre-push", name = "Production Gate", language = "system", entry = "bash scripts/pre_commit.sh", stages = [
+
+    # 2. Stateful Infrastructure Gate (Runs automatically before code is pushed to your remote branch)
+    { id = "pre-push", name = "Infrastructure Integration Gate", language = "system", entry = "bash scripts/pre_push.sh", stages = [
         "push",
     ] },
 ]

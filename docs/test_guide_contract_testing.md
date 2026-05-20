@@ -26,19 +26,21 @@ Schemas are stored in a central schemas/ directory, while the contract tests liv
         └── test_gold.py           # Validates Analytical view structures
 ```
 ------------------------------
-## 3. Implementation Patterns## A. Bronze: Structural Integrity
+## 3. Implementation Patterns
+
+### A. Bronze: Structural Integrity
 These tests verify that the JSON Schema correctly flags structural issues in the raw dictionaries extracted by the scrapers.
 
 * Test Focus: Nullability, Type-safety, and UTF-8 Regex (e.g., "Ødegaard").
 * Pattern: Pass "Good" and "Bad" dictionaries directly to the schema validator.
 
-## B. Silver: Iceberg Metadata Contract
+### B. Silver: Iceberg Metadata Contract
 These tests verify the Spark StructType that dictates how data is written to Iceberg.
 
 * Test Focus: Non-nullable Primary Keys, Precision of Decimal types (xG), and Column naming.
 * Pattern: Load the JSON via StructType.fromJson() and inspect the field attributes.
 
-## C. Gold: Analytical View Contract
+### C. Gold: Analytical View Contract
 These tests verify the SQL DDL that defines your DuckDB views/tables.
 
 * Test Focus: Presence of calculated metrics, Window function compatibility, and Column Aliasing.

@@ -7,37 +7,40 @@ requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{ name = "Data Engineer", email = "engineer@example.com" }]
 dependencies = [
-    "pyspark>=3.5.0,<4.0.0",               # Core Silver transformations
-    "duckdb>=0.10.0",                      # Gold layer & DQ metrics engine
-    "pandas>=2.2.0",                       # Scraper & Notebook data handling
-    "boto3>=1.34.0",                       # S3/MinIO & Security setup
-    "pyarrow>=15.0.0",                     # High-efficiency Parquet support
-    "rapidfuzz>=3.6.0",                    # Entity resolution fuzzy matching
-    "lxml>=5.1.0",                         # Fast parser for BeautifulSoup/Pandas
-    "playwright>=1.42.0",                  # Browser automation for Cloudflare bypass
-    "playwright-stealth>=1.0.6",           # Hides automation signatures
-    "requests>=2.31.0",                    # Fast API calls via mirrored session
-    "beautifulsoup4>=4.12.0",              # Hierarchical DOM parsing
-    "cryptography<47.0.0",                 # Security for credentials
-    "apache-airflow>=2.8.0",               # Airflow for orchestration
-    "apache-airflow-providers-common-sql", # Common SQL operators for Airflow
-    "apache-airflow-providers-amazon",     # Amazon provider for Airflow (S3, etc.)
+    "pyspark[connect]>=3.5.0,<3.6.0",       # FIX: Pin minor bounds to maintain core alignment with Airflow
+    "grpcio-status>=1.48.1",
+    "numpy<2.0.0",
+    "duckdb>=0.10.0",
+    "pandas>=2.1.0,<2.2.0",
+    "boto3>=1.34.0",
+    "pyarrow>=15.0.0",
+    "rapidfuzz>=3.6.0",
+    "lxml>=5.1.0",
+    "playwright>=1.42.0",
+    "playwright-stealth>=1.0.6",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "cryptography<47.0.0",
+    "apache-airflow>=2.8.0,<2.9.0",        # FIX: Protect package mapping layout against version collision
+    "apache-airflow-providers-common-sql",
+    "apache-airflow-providers-amazon",
 ]
 
 [dependency-groups]
 dev = [
     "pytest>=8.0.0",
     "pytest-mock>=3.12.0",
+    "pytest-recording>=0.13.0", # FIX: Added VCR cassette engine for offline parser testing
     "responses>=0.25.0",
     "pyiceberg[s3fs]>=0.6.0",
     "ruff>=0.3.0",
     "prek>=0.1.0",
     "ipykernel>=6.29.0",
-    "mypy>=1.9.0",            # Static logic validator
-    "types-requests",         # Mypy stubs for requests
-    "types-beautifulsoup4",   # Mypy stubs for bs4
-    "pandas-stubs",           # Mypy stubs for pandas
-    "boto3-stubs[s3]",        # Mypy stubs for boto3/s3
+    "mypy>=1.9.0",
+    "types-requests",
+    "types-beautifulsoup4",
+    "pandas-stubs",
+    "boto3-stubs[s3]",
 ]
 
 [tool.uv]
@@ -45,30 +48,28 @@ environments = ["sys_platform == 'linux'"]
 managed = true
 package = false
 
-
 [tool.mypy]
 python_version = "3.12"
 explicit_package_bases = true
-# Enable all strict type-checking checks. 
-# This includes disallow_untyped_defs, disallow_untyped_calls, etc.
 strict = true
-# If a library you use doesn't have type hints, don't crash.
-# You can override this per-module if needed.
 ignore_missing_imports = true
-# Force specific 'vague' checks
 disallow_any_generics = true
 check_untyped_defs = true
-# Cleanliness flags
 warn_unused_ignores = true
 warn_redundant_casts = true
 warn_unused_configs = true
-# This will error if you return 'Any' from a function you claimed was typed.
 warn_return_any = true
-# This allows you to use your tests/unit/conftest.py types properly
+
 [[tool.mypy.overrides]]
 module = "tests.*"
 disallow_untyped_defs = true
 
+# FIX: Added Airflow library skips. This prevents strict Mypy rule evaluation
+# from throwing type errors on native Airflow operators and imports during commit hooks.
+[[tool.mypy.overrides]]
+module = "airflow.*"
+ignore_missing_imports = true
+follow_imports = "skip"
 
 [tool.ruff]
 line-length = 100
@@ -83,7 +84,13 @@ testpaths = ["."]
 python_files = "test_*.py"
 addopts = "-m 'not integration'"
 markers = ["integration: marks tests that require Docker/MinIO services"]
-filterwarnings = ["ignore:Stealth has already been applied:UserWarning"]
+# FIX: Added an extra warning block filter to suppress downstream VCR py312 framework deprecation notifications
+filterwarnings = [
+    "ignore:Stealth has already been applied:UserWarning",
+    "ignore:.*vcr.*:DeprecationWarning",
+    "ignore:.*distutils.*:DeprecationWarning",
+    "ignore:.*__version__.*attribute is deprecated.*:DeprecationWarning:airflow.utils.timezone"
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]

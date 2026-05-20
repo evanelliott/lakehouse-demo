@@ -1,9 +1,15 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # scripts/pre_push.sh
-echo "🏗️  Starting Integration Plumbing Check..."
+set -e
 
-# This specifically starts MinIO, Catalog, and the Tester
-docker compose --profile test up --exit-code-from integration-tester
+echo "🏗️  Executing Infrastructure Integration Gate (pre-push)..."
 
-# Cleanup
-docker compose --profile test down
+# 1. Warm-start the test profile mesh. 
+# --build quickly evaluates code edits; --exit-code-from returns the pytest results.
+docker compose --profile test up --build --exit-code-from integration-tester
+
+echo "⏸️  Pausing test stack..."
+# 2. Stop the containers instantly without the overhead of tearing down virtual networks.
+docker compose --profile test stop
+
+echo "✅ Integration gate completed successfully!"

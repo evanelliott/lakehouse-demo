@@ -1,32 +1,17 @@
 {
   "name": "Lakehouse Demo - Sandboxed Dev",
+  "dockerComposeFile": "../docker-compose.yml",
+  "service": "devcontainer",
   "workspaceFolder": "/app",
-  "workspaceMount": "source=${localWorkspaceFolder},target=/app,type=bind",
-  "build": {
-    "dockerfile": "Dockerfile",
-    "context": "..",
-    "target": "development"
-  },
-  // 1. Networking: Start on 'bridge' for internet access to fetch extensions
-  "runArgs": [
-    "--network",
-    "bridge",
-    "--name",
-    "lakehouse-dev-container"
-  ],
-  // 2. Mounts: Provide Docker-in-Docker capability for the hotswap script
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
-  // 3. Lifecycle Hooks
-  // Initialize: Setup the virtual networks on your Mac
-  "initializeCommand": "bash scripts/init_dev_net.sh",
-  // PostCreate: Setup local configs (no internet required if Dockerfile was fast)
+  
   "postCreateCommand": "bash scripts/dev_setup.sh",
-  // PostAttach: This is the "Hotswap" - runs AFTER extensions are installed.
-  // It connects to 'lakehouse-airgap' and disconnects from 'bridge'.
-  "postAttachCommand": "bash scripts/container_entrypoint.sh",
-  // 4. Extensions (These will now download successfully)
+  "postStartCommand": "git config --global --add safe.directory /app",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest"
+    }
+  },
   "customizations": {
     "vscode": {
       "extensions": [
@@ -35,16 +20,13 @@
         "ms-python.mypy-vscode",
         "tamasfe.even-better-toml",
         "mtakhtarov.duckdb-sql",
-        "apache.pyspark-explorer",
-        "ms-toolsai.jupyter",
-        "ms-azuretools.vscode-docker"
+        "apache.pyspark-explorer"
       ],
       "settings": {
-        "python.defaultInterpreterPath": "/usr/local/bin/python3",
-        "python.analysis.extraPaths": [
-          "/app"
-        ],
+        "python.defaultInterpreterPath": "/opt/venv/bin/python3",
+        "python.analysis.extraPaths": ["/app"],
         "python.testing.pytestEnabled": true,
+        "telemetry.telemetryLevel": "off",
         "editor.formatOnSave": true,
         "editor.codeActionsOnSave": {
           "source.fixAll.ruff": "explicit",
@@ -53,10 +35,10 @@
       }
     }
   },
-  // 5. Environment
   "containerEnv": {
     "PYTHONPATH": "/app",
-    "JAVA_HOME": "/usr/lib/jvm/java-17-openjdk-universal"
+    "PYARROW_IGNORE_TIMEZONE": "1",
+    "SPARK_LOCAL_IP": "127.0.0.1"
   },
-  "remoteUser": "root"
+  "remoteUser": "vscode"
 }
