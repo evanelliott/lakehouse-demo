@@ -23,30 +23,31 @@ This specification defines the stateless, air-gapped unit testing framework for 
 
 ------------------------------
 ## 2. Directory Structure Mappings
-
+```sh
 tests/unit/
-├── conftest.py                       # Session-scoped loopback Spark Connect factory
+├── conftest.py                             # Session-scoped loopback Spark Connect factory
 │
-├── core_utils/                       # Shared Core Utilities Portfolio
-│   └── test_deduplication.py         # Handles U-UTL-01 to U-UTL-03
+├── core_utils/                             # Shared Core Utilities Portfolio
+│   └── test_deduplication.py               # Handles U-UTL-01 to U-UTL-03
 │
-└── scraper/                          # Data Ingestion & Extraction Core
-    ├── fixtures/                     # Permanent, immutable data contract mocks
-    │   ├── raw_league_response.json  # Nested dictionary list sample
-    │   ├── raw_match_response.json   # Deep Home/Away nested split array sample
-    │   └── injury_table.html         # Positional mobile responsive HTML table grid
+└── scraper/                                # Data Ingestion & Extraction Core
+    ├── fixtures/                           # Permanent, immutable data contract mocks
+    │   ├── raw_league_response.json        # Nested dictionary list sample
+    │   ├── raw_match_response.json         # Deep Home/Away nested split array sample
+    │   └── injury_table.html               # Positional mobile responsive HTML table grid
     │
-    ├── cassettes/                    # Frozen plain-text text HTTP records
+    ├── cassettes/                          # Frozen plain-text text HTTP records
     │   └── test_scraper_network_handshake/
     │       ├── test_understat_handshake_success[...].yaml
     │       └── test_premier_injuries_handshake_success.yaml
     │
-    ├── test_scraper_utils.py             # Layer tracking for validation helpers (UTL)
-    ├── test_scraper_network_handshake.py # Layer tracking for session sequences (NET)
-    └── test_scraper_data_extraction.py   # Layer tracking for payload processing (EXT)
-
+    ├── test_scraper_utils.py               # Layer tracking for validation helpers (UTL)
+    ├── test_scraper_network_handshake.py   # Layer tracking for session sequences (NET)
+    └── test_scraper_data_extraction.py     # Layer tracking for payload processing (EXT)
+```
 ------------------------------
-## 3. Core Functional Testing Layers## Layer A: Shared Core Utilities (U-UTL-xx)
+## 3. Core Functional Testing Layers
+## Layer A: Shared Core Utilities (U-UTL-xx)
 
 * Scope: Validates global data-lake structural firewalls, deduplication engines, and string preprocessing format normalisers.
 * Storage Requirement: 100% in-memory python variable arrays.
@@ -65,7 +66,8 @@ tests/unit/
 * Design Rule: Leverages PyTest Parameterisation matrices to map universal rules across all five Understat JSON datasets and Premier Injuries HTML tables in compressed, low-overhead files.
 
 ------------------------------
-## 4. Finalised Unit Test Registry Mappings## 🛠️ Shared Core Utilities (U-UTL-xx)
+## 4. Finalised Unit Test Registry Mappings
+## 🛠️ Shared Core Utilities (U-UTL-xx)
 
 | ID | Focus Area | Type | Expected Behaviour / Key Assertion |
 |---|---|---|---|
@@ -101,7 +103,8 @@ tests/unit/
 | U-EXT-08 | Premier Injuries | Table Layout Drift | Negative | Table class modifications or grid structural drift items trigger a layout validation check and raise a SelectorNotFoundError. |
 
 ------------------------------
-## 5. Automation and Governance Operational Rules## Rule 1: Symmetrical PySpark Row Conversions
+## 5. Automation and Governance Operational Rules
+## Rule 1: Symmetrical PySpark Row Conversions
 To clear strict type-checking parameterizations [pyproject.toml], all happy path extraction test assertions must maps dictionary results lists into native pyspark.sql.Row objects before running spark.createDataFrame(). This bypasses strict generic RowLike type-variable constraints and preserves compilation stability.
 ## Rule 2: Fail-Safe Network Hotswapping
 To regenerate cassette logs without compromising air-gapped isolation networks, engineers use a automated hotswap wrapper script (scripts/generate_cassettes.sh) from the host OS terminal. This temporarily connects the default docker bridge, triggers pytest --record-mode=once, and utilizes an internal shell trap sequence to guarantee the bridge is instantly severed even if a test block crashes or terminates prematurely.

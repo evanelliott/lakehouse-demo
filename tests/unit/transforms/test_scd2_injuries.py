@@ -2,9 +2,9 @@ from typing import Any, Iterable, cast
 
 import pytest
 from pyspark.sql import SparkSession
-from src.transforms.injuries import update_injury_history
 
 from src.exceptions import FutureDateError, SCD2TimelineException
+from src.transforms.injuries import update_injury_history
 
 
 @pytest.mark.scd2
